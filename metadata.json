@@ -1,0 +1,7 @@
+{
+  "name": "Taalbooster.nl",
+  "description": "An advanced NT2 (Dutch as Second Language) reading assistant that converts text and files into interactive, spoken lessons using Google Gemini AI.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
