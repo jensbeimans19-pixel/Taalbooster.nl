@@ -2,7 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { SentencePair, TargetLanguage, AviLevel, QuizQuestion, TaalStartLevel, TaalStartLesson } from "../types";
 
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+const ai = new GoogleGenAI(process.env.API_KEY || '');
 
 /**
  * Synthesizes speech using the PHP bridge on your own server (Vimexx).
@@ -30,7 +30,7 @@ export const synthesizeSpeech = async (text: string, langCode: string = 'nl-NL')
     
     throw new Error("No audioContent received from server.");
   } catch (error: any) {
-    console.warn("TTS via PHP bridge failed, fallback to empty:", error.message);
+    console.warn("TTS via PHP bridge failed:", error.message);
     return ""; 
   }
 };
@@ -56,7 +56,9 @@ export const processContent = async (
   file: File | null,
   targetLanguage: TargetLanguage
 ): Promise<SentencePair[]> => {
+  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
   let parts: any[] = [];
+  
   if (file) {
     const arrayBuffer = await file.arrayBuffer();
     const base64Data = arrayBufferToBase64(arrayBuffer);
@@ -72,33 +74,35 @@ export const processContent = async (
 
   parts.push({ text: prompt });
 
-  const response = await ai.getGenerativeModel({ model: "gemini-1.5-flash" }).generateContent({
+  const result = await model.generateContent({
     contents: [{ role: "user", parts }],
     generationConfig: { responseMimeType: "application/json" }
   });
 
-  return JSON.parse(response.response.text());
+  return JSON.parse(result.response.text());
 };
 
 /**
  * Simplifies text to a specific AVI level
  */
 export const simplifyTextToAvi = async (textInput: string, file: File | null, level: AviLevel): Promise<string> => {
+  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
   const prompt = `Herschrijf deze tekst naar AVI niveau ${level}. Houd het leesbaar voor dyslexie. Tekst: ${textInput}`;
-  const response = await ai.getGenerativeModel({ model: "gemini-1.5-flash" }).generateContent(prompt);
-  return response.response.text().trim();
+  const result = await model.generateContent(prompt);
+  return result.response.text().trim();
 };
 
 /**
  * Generates quiz questions
  */
 export const generateQuizQuestions = async (text: string): Promise<QuizQuestion[]> => {
+  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
   const prompt = `Genereer 5 begripsvragen over deze tekst in JSON formaat: ${text}`;
-  const response = await ai.getGenerativeModel({ model: "gemini-1.5-flash" }).generateContent({
+  const result = await model.generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { responseMimeType: "application/json" }
   });
-  return JSON.parse(response.response.text());
+  return JSON.parse(result.response.text());
 };
 
-// --- Rest van de functies (TaalStart, Flashcards etc.) kunnen hieronder blijven staan ---
+// --- Voor de overige functies zoals TaalStart en Flashcards geldt dezelfde model-aanroep ---
