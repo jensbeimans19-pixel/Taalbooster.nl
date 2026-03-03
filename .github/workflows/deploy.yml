@@ -1,25 +1,38 @@
 name: Deploy naar Vimexx
+
 on:
   push:
     branches:
       - main
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - name: 📂 Code ophalen
+        uses: actions/checkout@v4
+
+      - name: 🟢 Node.js instellen
+        uses: actions/setup-node@v4
         with:
           node-version: 18
-      - run: npm install
-      - run: npm run build
-      - name: Upload naar Vimexx
+          cache: 'npm'
+
+      - name: 📦 Dependencies installeren
+        run: npm install
+
+      - name: 🏗️ Build maken
+        run: npm run build
+
+      - name: 🚀 Uploaden naar Vimexx
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-      with:
+        with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
           server-dir: ./public_html/
-          port: 21
           protocol: ftp
+          port: 21
+          passive: true
