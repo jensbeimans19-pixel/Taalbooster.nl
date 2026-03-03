@@ -1,8 +1,9 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { SentencePair, TargetLanguage, AviLevel, QuizQuestion, TaalStartLevel, TaalStartLesson } from "../types";
 
-// Initialiseer de AI client
-const ai = new GoogleGenAI(process.env.VITE_GEMINI_API_KEY || '');
+// Initialiseer de AI client (Vite gebruikt VITE_ prefix voor env variabelen)
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+const genAI = new GoogleGenAI(apiKey);
 
 /**
  * Gebruikt de PHP-brug op Vimexx voor Text-to-Speech
@@ -25,37 +26,42 @@ export const synthesizeSpeech = async (text: string, langCode: string = 'nl-NL')
 };
 
 /**
- * Cruciaal voor Reader.tsx: Zet PCM data om naar een speelbare URL
+ * Cruciaal voor Reader.tsx: Zet PCM data om naar een speelbare WAV URL
  */
 export const createWavUrl = (base64PCM: string): string => {
-  const binaryString = atob(base64PCM);
-  const len = binaryString.length;
-  const buffer = new ArrayBuffer(44 + len);
-  const view = new DataView(buffer);
-  
-  const writeString = (v: DataView, o: number, s: string) => {
-    for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i));
-  };
+  try {
+    const binaryString = atob(base64PCM);
+    const len = binaryString.length;
+    const buffer = new ArrayBuffer(44 + len);
+    const view = new DataView(buffer);
+    
+    const writeString = (v: DataView, o: number, s: string) => {
+      for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i));
+    };
 
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + len, true);
-  writeString(view, 8, 'WAVE');
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, 24000, true);
-  view.setUint32(28, 24000 * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeString(view, 36, 'data');
-  view.setUint32(40, len, true);
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + len, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, 24000, true);
+    view.setUint32(28, 24000 * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, len, true);
 
-  const bytes = new Uint8Array(buffer, 44);
-  for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+    const bytes = new Uint8Array(buffer, 44);
+    for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
 
-  const blob = new Blob([buffer], { type: 'audio/wav' });
-  return URL.createObjectURL(blob);
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    console.error("WAV creation failed", e);
+    return "";
+  }
 };
 
 /**
@@ -66,7 +72,7 @@ export const processContent = async (
   file: File | null,
   targetLanguage: TargetLanguage
 ): Promise<SentencePair[]> => {
-  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
   let parts: any[] = [];
 
   if (file) {
@@ -78,11 +84,7 @@ export const processContent = async (
   const prompt = `Vertaal naar ${targetLanguage}. Return ONLY JSON array: [{ "nl": "...", "tr": "..." }]`;
   parts.push({ text: prompt + (textInput ? ` Context: ${textInput}` : '') });
 
-  const result = await model.generateContent({
-    contents: [{ role: "user", parts }],
-    generationConfig: { responseMimeType: "application/json" }
-  });
-
+  const result = await model.generateContent({ contents: [{ role: "user", parts }] });
   return JSON.parse(result.response.text());
 };
 
@@ -91,7 +93,7 @@ export const processContent = async (
  */
 export const getWordDefinition = async (word: string): Promise<string> => {
   try {
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(`Leg het woord "${word}" simpel uit in het Nederlands.`);
     return result.response.text().trim();
   } catch {
@@ -106,8 +108,8 @@ export const generateIllustration = async (text: string): Promise<string> => {
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(text)}?width=400&height=300&nologo=true`;
 };
 
-// --- Overige functies om build errors te voorkomen ---
-export const simplifyTextToAvi = async (t: string, f: any, l: string) => t;
+// --- Fallback exports om te voorkomen dat andere componenten crashen ---
+export const simplifyTextToAvi = async (t: string) => t;
 export const generateQuizQuestions = async () => [];
 export const extractWordsForFlash = async () => [];
-export const generateTaalStartLesson = async () => ({});
+export const generateTaalStartLesson = async () => ({}) as TaalStartLesson;
